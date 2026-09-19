@@ -5,6 +5,7 @@ import ctypes as C
 import datetime
 import json
 import pathlib
+import re
 import tempfile
 import threading
 import time
@@ -14,6 +15,21 @@ libc = C.CDLL(None)
 libc.malloc.argtypes = [C.c_size_t]
 libc.malloc.restype = C.c_void_p
 libc.free.argtypes = [C.c_void_p]
+
+
+def newest_artifact():
+    """Highest versioned artifact in dist/, mirroring CPA's own plugin discovery rule."""
+    def rank(path):
+        found = re.match(r'cpa-window-keeper-v(\d+)\.(\d+)\.(\d+)\.so$', path.name)
+        return tuple(int(part) for part in found.groups()) if found else None
+
+    candidates = [p for p in (ROOT / 'dist').glob('cpa-window-keeper-v*.so') if rank(p)]
+    assert candidates, 'no versioned artifact in dist/ — run scripts/build.sh first'
+    return max(candidates, key=rank)
+
+
+ARTIFACT = newest_artifact()
+EXPECTED_VERSION = re.match(r'cpa-window-keeper-v(.+)\.so$', ARTIFACT.name).group(1)
 
 
 class Buffer(C.Structure):
@@ -103,7 +119,7 @@ def free(ptr, size):
 
 
 def main():
-    library = C.CDLL(str(ROOT / 'dist/cpa-window-keeper-v0.1.4.so'))
+    library = C.CDLL(str(ARTIFACT))
     library.cliproxy_plugin_init.argtypes = [C.POINTER(Host), C.POINTER(Plugin)]
     library.cliproxy_plugin_init.restype = C.c_int
     host, plugin = Host(1, None, callback, free), Plugin()
@@ -136,7 +152,7 @@ def main():
         lifecycle = {'config_yaml': base64.b64encode(json.dumps(config).encode()).decode(), 'schema_version': 1}
         try:
             registration = invoke('plugin.register', lifecycle)
-            assert registration['metadata']['Version'] == '0.1.4'
+            assert registration['metadata']['Version'] == EXPECTED_VERSION
             assert registration['metadata']['GitHubRepository'].startswith('https://github.com/')
             assert invoke('management.register', {})['routes']
             html = invoke('management.handle', {'Method': 'GET', 'Path': '/dashboard'})

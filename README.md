@@ -14,11 +14,17 @@ is available earlier instead of waiting for the first real request of the day.
 
 The dashboard is served from inside the CPA Manager Plus sidebar (same-origin iframe) and
 follows the panel's theme variables. It is built as a glass/IOS-style card layout with no
-credential prompt when the panel login state can be reused.
+credential prompt when the panel login state can be reused. The interface is bilingual
+(English / 简体中文) and follows the panel's own language setting.
 
 | Light | Dark |
 | --- | --- |
 | ![dashboard light](docs/dashboard-light.png) | ![dashboard dark](docs/dashboard-dark.png) |
+
+Both screenshots are full-height captures of the dashboard exactly as it is served inside the
+sidebar, taken from a live panel with every account identifier masked (`••••…••••`) in the DOM
+before the image is written; the capture script refuses to save an image that still contains an
+auth index or an email address.
 
 ## Status and compatibility
 
@@ -100,7 +106,7 @@ never OAuth tokens.
    bash scripts/build.sh          # Docker build, CPU-pinned; see "Build and test"
    ```
 2. Put the artifact in the host plugin directory, e.g.
-   `plugins/linux/amd64/cpa-window-keeper-v0.1.4.so`. Use a **new versioned filename** per
+   `plugins/linux/amd64/cpa-window-keeper-v0.1.7.so`. Use a **new versioned filename** per
    release; never overwrite a library mapped into a running CPA process. Plugin discovery picks
    the highest versioned filename.
 3. Add the config block above and enable the plugin. The first enable must be a real
@@ -148,6 +154,16 @@ The panel injects its theme variables (`--primary-color`, `--app-surface`, `--te
 `--border-color`) into the plugin iframe and sets `data-theme="white" | "dark"` on the document
 element; the dashboard styles itself from those values, so it follows the panel theme.
 
+The dashboard is bilingual (English / 简体中文) and follows the panel's language. It reads the
+panel's own `cli-proxy-language` entry from same-origin `localStorage`
+(`{"state":{"language":"en"|"zh-CN"}}`), falls back to the parent document's `<html lang>`, then to
+`navigator.language`. The page also listens for the `storage` event, so switching the language in
+the panel re-renders the dashboard immediately, without reloading the iframe. The `EN / 中文`
+button in the toolbar overrides the language for the current view only and does not write the
+panel's stored choice; reloading returns to the panel language. CPA registers plugin metadata (the
+sidebar label, the description and the config field help) as single static strings and does not
+localize them, so those follow whatever was registered.
+
 ## Build and test
 
 ```bash
@@ -170,6 +186,16 @@ Go toolchain with GCC works: `go test -race ./... && go build -buildmode=c-share
   ctypes and the C ABI.
 - `scripts/prepare_sandbox.py` / `sandbox_verify.py` / `sandbox_lifecycle.py`: isolated CPA
   container checks using read-only OAuth access-token snapshots **without refresh tokens**.
+- `scripts/verify_i18n.py`: drives the live panel with a real browser, switches the panel language
+  between `en` and `zh-CN`, and asserts the dashboard follows (title, buttons, session badge,
+  status labels, meter caption), that an in-page change is followed over the `storage` event
+  without reloading the iframe, that the toolbar override does not write the panel's stored
+  choice, and that no `{0}`-style placeholder or stray CJK reaches an English screen. Needs a
+  public panel URL and the browser wrapper: `CPAMP_PANEL_URL=... /opt/browser-automation/run.sh
+  scripts/verify_i18n.py`.
+- `scripts/make_readme_shots.py`: regenerates `docs/dashboard-light.png` / `docs/dashboard-dark.png`
+  from the live panel in English, masks account identifiers in the DOM before capture, and refuses
+  to write an image that still contains one.
 
 Real provider measurements and production behaviour are recorded in
 [VERIFICATION.md](VERIFICATION.md). Private sandbox credentials are deliberately kept outside

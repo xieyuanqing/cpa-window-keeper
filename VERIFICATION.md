@@ -75,3 +75,38 @@ The dashboard decoded only `enc::v1::` panel storage. Current CPAMP builds write
   - panel login **without** 「记住密码」 → `password_visible: true`, badge `需要密钥` — unchanged, still the documented CPAMP limitation.
 - Upgrade: `python3 scripts/upgrade_production.py --so dist/cpa-window-keeper-v0.1.5.so --expect-version 0.1.5` → `upgraded: true` 0.1.4→0.1.5, `config_preserved: true`, `dry_run: false`, 3 accounts. Hot swap, no CPA restart.
 
+## Bilingual dashboard and masked README shots — 2026-09-19 (v0.1.6 / v0.1.7)
+
+Artifact: `dist/cpa-window-keeper-v0.1.7.so`, SHA-256 `d73bffcc88d0f2915602b91248d23d807191fad6fea0f9cb7c96c579ce93b09b`.
+
+The dashboard was Chinese-only. It now follows the panel's own language, and the README screenshots
+are captured with every account identifier masked.
+
+- Language resolution: same-origin `localStorage['cli-proxy-language']` (Zustand payload,
+  `{"state":{"language":"en"|"zh-CN"}}`) → parent document `<html lang>` → `navigator.language`. A
+  `storage` listener re-renders on a panel language change **without** reloading the iframe. The
+  toolbar `EN / 中文` button overrides the current view only and never writes the panel's stored
+  choice.
+- `scripts/verify_i18n.py` against the production panel (`CPAMP_PANEL_URL=https://cliproxy.nijikit.com/management.html`)
+  reported `ALL ASSERTIONS PASSED`:
+  - panel language `en` → `5-Hour Window Keeper`, status labels `Counting down` / `Quota blocked · waiting for reset` /
+    `Account disabled · skipped`, meter captions `5-hour used` at 27% / 100% / 0%, no CJK left in the
+    page chrome, no `{0}`-style placeholder left anywhere.
+  - panel language `zh-CN` → `5 小时自动开窗` with the original labels, and a marker set inside the
+    frame still present afterwards — the language switch went through the `storage` event, not a reload.
+  - toolbar override → view switches immediately while `cli-proxy-language` stays `zh-CN`.
+- `scripts/make_readme_shots.py` re-shoots `docs/dashboard-{light,dark}.png` in English. Account auth
+  indexes (the `abcd…1234` form the dashboard renders) are rewritten to `••••…••••` in the DOM, then
+  the script asserts that neither the full index, nor its 4-character fragments, nor any email
+  address remains — and only then writes the image.
+- v0.1.6 was deployed and superseded inside the same session: its `t()` substituted placeholders one
+  argument off, which the live panel rendered as a literal `Mode: {0} | Codex: automatic window
+  start …` summary. v0.1.7 fixes the substitution (regex `{n}` → `argv[n]`, the same implementation
+  the sibling `cpa-quota-cards` plugin uses) and the verifier now fails on a leftover placeholder.
+- Upgrade: `python3 scripts/upgrade_production.py --so dist/cpa-window-keeper-v0.1.7.so --expect-version 0.1.7`
+  → `upgraded: true` 0.1.6→0.1.7, `config_preserved: true`, `dry_run: false`, 3 accounts,
+  `dashboard_bytes: 23139`. Hot swap, no CPA restart.
+- Known limitation: CPA registers plugin metadata (sidebar label 「5 小时自动开窗」, description,
+  config field help) as single static strings and does not localize them; only the dashboard page
+  follows the panel language.
+

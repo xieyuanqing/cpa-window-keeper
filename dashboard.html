@@ -121,29 +121,116 @@ input[type=password]:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%
 <header class="hero">
   <div class="hero-top">
     <div class="app-icon">◎</div>
-    <div><h1>5 小时自动开窗</h1><p class="sub">Window Keeper · 只在空闲窗口发最小请求</p></div>
+    <div><h1 id="h1">5 小时自动开窗</h1><p class="sub" id="sub">Window Keeper · 只在空闲窗口发最小请求</p></div>
   </div>
   <div class="toolbar">
     <span id="session" class="pill">正在读取面板登录态…</span>
     <button id="check" class="btn primary">检查调度</button>
     <button id="reconnect" class="btn">重新读取登录态</button>
     <button id="manualToggle" class="btn hidden">手动输入密钥</button>
+    <button id="lang" class="btn" title="语言 / Language">EN</button>
   </div>
   <div id="manual" class="manual hidden">
-    <p>面板登录时勾选「记住密码」即可免输入；面板端已退出登录时需要重新登录。</p>
+    <p id="manualHint">面板登录时勾选「记住密码」即可免输入；面板端已退出登录时需要重新登录。</p>
     <div class="row"><input id="key" type="password" placeholder="CPA 管理密钥（不是面板管理员密码）" autocomplete="off"><button id="connect" class="btn primary">连接</button><button id="disconnect" class="btn">停止刷新</button></div>
   </div>
   <div id="message" class="note"></div>
 </header>
 <div class="card summary" id="summary">尚未连接。首次安装默认 dry_run=true，仅观察，不发请求。开关与模型可在 CPA 插件设置中修改。</div>
 <div id="accounts" class="accounts"></div>
-<p class="hint">不会提前重置官方限额，不会恢复手动禁用账号。</p>
+<p class="hint" id="hint">不会提前重置官方限额，不会恢复手动禁用账号。</p>
 </div>
 <!-- data-cfasync="false": Cloudflare Rocket Loader must not rewrite this inline script
      into a non-executable type; the plugin CSP intentionally blocks Rocket Loader's loader. -->
 <script data-cfasync="false">
-let secret='',timer;const $=id=>document.getElementById(id);
-const names={disabled:'账号已禁用 · 跳过',host_cooldown:'CPA 冷却中',quota_error:'额度查询失败 · 退避',no_five_hour_window:'不是 5 小时额度 · 跳过',quota_blocked:'额度阻挡 · 等待恢复',counting_down:'正在倒计时',window_started:'已验证开窗成功',awaiting_window_confirmation:'尚未确认开窗 · 防重复冷却',idle_grace:'空闲状态确认中',would_start_window:'检测到空闲 · 演练模式不发送',request_reserved:'已持久化发送预留',request_sent_waiting_verification:'请求成功 · 等待额度回查',request_failed_waiting_verification:'请求失败 · 等待回查，不立即重试'};
+let secret='',timer,last=null;const $=id=>document.getElementById(id);
+/* Bilingual UI. The language follows the panel's own choice (the iframe is same-origin, so the
+   panel's localStorage is directly readable); the toolbar button only overrides the current
+   view and is not persisted. */
+const STR={
+ title:['5 小时自动开窗','5-Hour Window Keeper'],
+ sub:['Window Keeper · 只在空闲窗口发最小请求','Window Keeper · one minimal request, only when the window is idle'],
+ sessionReading:['正在读取面板登录态…','Reading the panel login state…'],
+ sessionReused:['已沿用面板登录态','Panel login state reused'],
+ sessionMemory:['已连接 · 密钥仅本页内存','Connected · key held in this page only'],
+ sessionNeedKey:['需要密钥','Key required'],
+ sessionStopped:['已停止刷新','Refresh stopped'],
+ btnCheck:['检查调度','Check schedule'],
+ btnReconnect:['重新读取登录态','Reload panel login state'],
+ btnManual:['手动输入密钥','Enter key manually'],
+ btnConnect:['连接','Connect'],
+ btnStop:['停止刷新','Stop refreshing'],
+ btnLang:['EN','中文'],
+ manualHint:['面板登录时勾选「记住密码」即可免输入；面板端已退出登录时需要重新登录。','Tick "remember password" when logging into the panel and nothing has to be typed here. If the panel session is gone, log in again first.'],
+ keyPlaceholder:['CPA 管理密钥（不是面板管理员密码）','CPA management key (not the panel admin password)'],
+ initialSummary:['尚未连接。首次安装默认 dry_run=true，仅观察，不发请求。开关与模型可在 CPA 插件设置中修改。','Not connected yet. A fresh install defaults to dry_run=true: observe only, nothing is sent. Enable flags and models live in the CPA plugin settings.'],
+ msgReused:['密钥来自面板登录态，无需在此输入；面板退出登录后重新点「重新读取登录态」。','Key reused from the panel login state, nothing to type here. After the panel logs out, click "Reload panel login state" again.'],
+ msgAuthLost:['面板登录态已失效或未勾选「记住密码」。请回到面板重新登录（勾选记住密码），然后点「重新读取登录态」。','The panel login state expired or "remember password" was off. Log into the panel again (with remember password), then click "Reload panel login state".'],
+ msgNoPanel:['未检测到面板登录态。请回面板登录时勾选「记住密码」，或在此手动输入。','No panel login state found. Log into the panel with "remember password", or enter the key manually here.'],
+ msgQueued:['已排队；仍遵守额度检查间隔和防重复规则','Queued; quota-check intervals and duplicate protection still apply.'],
+ msgAuthRetry:['鉴权失效，请重新读取登录态','Authentication failed — reload the panel login state.'],
+ msgStopped:['已停止刷新；自动调度不受影响','Refresh stopped; automatic scheduling is unaffected.'],
+ summaryLine:['模式：{0} ｜ Codex：{1} / low ｜ Claude：{2} / 关闭思考 / 1 token{3}{4}','Mode: {0} | Codex: {1} / low | Claude: {2} / thinking off / 1 token{3}{4}'],
+ modeObserve:['仅观察（不会发送）','observe only (sends nothing)'],
+ modeAuto:['自动开窗','automatic window start'],
+ sendingSuspended:[' ｜ 发送已暂停',' | sending suspended'],
+ errorSuffix:[' ｜ 错误：{0}',' | error: {0}'],
+ notRunning:['未运行：{0}','Not running: {0}'],
+ labReset:['窗口结束','Window ends'],
+ labNextCheck:['下次额度检查','Next quota check'],
+ labLastAttempt:['最近发送','Last send attempt'],
+ labLastSuccess:['最近验证成功','Last verified start'],
+ labResult:['已尝试 / 已验证','Attempts / verified'],
+ labNote:['提示','Note'],
+ meterCap:['5 小时已用','5-hour used'],
+ hint:['不会提前重置官方限额，不会恢复手动禁用账号。','Does not reset provider limits early and does not re-enable manually disabled accounts.'],
+ httpError:['HTTP {0}：请检查 CPA 管理密钥与反代路由','HTTP {0}: check the CPA management key and the reverse-proxy route']
+};
+const STATUS={
+ disabled:['账号已禁用 · 跳过','Account disabled · skipped'],
+ host_cooldown:['CPA 冷却中','CPA cooldown'],
+ quota_error:['额度查询失败 · 退避','Quota check failed · backing off'],
+ no_five_hour_window:['不是 5 小时额度 · 跳过','Not a 5-hour quota · skipped'],
+ quota_blocked:['额度阻挡 · 等待恢复','Quota blocked · waiting for reset'],
+ counting_down:['正在倒计时','Counting down'],
+ window_started:['已验证开窗成功','Window start verified'],
+ awaiting_window_confirmation:['尚未确认开窗 · 防重复冷却','Window not confirmed · dedupe cooldown'],
+ idle_grace:['空闲状态确认中','Confirming idle state'],
+ would_start_window:['检测到空闲 · 演练模式不发送','Idle detected · dry run, not sending'],
+ request_reserved:['已持久化发送预留','Send reserved (persisted)'],
+ request_sent_waiting_verification:['请求成功 · 等待额度回查','Request sent · awaiting quota readback'],
+ request_failed_waiting_verification:['请求失败 · 等待回查，不立即重试','Request failed · awaiting readback, no immediate retry']
+};
+let LANG='zh';
+function t(k){const e=STR[k];if(!e)return k;const a=[].slice.call(arguments,1),s=e[LANG==='en'?1:0]||e[0];return a.length?s.replace(/\{(\d+)\}/g,(m,i)=>a[i]):s}
+function statusName(k){const e=STATUS[k];return e?(LANG==='en'?e[1]:e[0]):k}
+function detectLang(){
+  const norm=v=>String(v||'').toLowerCase().indexOf('zh')===0?'zh':'en';
+  try{
+    const raw=localStorage.getItem('cli-proxy-language');
+    if(raw){
+      let v=null;try{v=JSON.parse(raw)}catch(e){v=raw}
+      const val=(v&&v.state&&v.state.language)||(v&&v.language)||(typeof v==='string'&&v);
+      if(val)return norm(val);
+    }
+  }catch(e){}
+  try{
+    const doc=(window.parent&&window.parent!==window)?window.parent.document:document;
+    if(doc&&doc.documentElement&&doc.documentElement.lang)return norm(doc.documentElement.lang);
+  }catch(e){}
+  return norm(navigator.language);
+}
+function applyStatic(){
+  document.title=t('title');
+  $('h1').textContent=t('title');$('sub').textContent=t('sub');
+  $('check').textContent=t('btnCheck');$('reconnect').textContent=t('btnReconnect');
+  $('manualToggle').textContent=t('btnManual');$('connect').textContent=t('btnConnect');
+  $('disconnect').textContent=t('btnStop');$('lang').textContent=t('btnLang');
+  $('manualHint').textContent=t('manualHint');$('key').placeholder=t('keyPlaceholder');
+  $('hint').textContent=t('hint');
+  document.documentElement.setAttribute('lang',LANG==='en'?'en':'zh-CN');
+  if(!secret&&!last)$('summary').textContent=t('initialSummary');
+}
 const tones={window_started:'good',counting_down:'info',request_sent_waiting_verification:'info',would_start_window:'info',request_reserved:'idle',idle_grace:'idle',awaiting_window_confirmation:'idle',host_cooldown:'idle',disabled:'idle',no_five_hour_window:'idle',quota_blocked:'warn',quota_error:'warn',request_failed_waiting_verification:'bad',request_failed:'bad'};
 const time=s=>!s||s.startsWith('0001-')?'—':new Date(s).toLocaleString();
 const clamp=v=>Math.max(0,Math.min(100,Number(v)||0));
@@ -179,8 +266,8 @@ function panelKey(){
   }catch(e){return ''}
 }
 function setSession(text,kind){const el=$('session');el.textContent=text;el.className=kind==='plain'?'pill plain':'pill'}
-function showManual(hint){$('manual').classList.remove('hidden');$('manualToggle').classList.add('hidden');$('message').innerHTML=hint;setSession('需要密钥','plain')}
-async function api(path,method='GET'){const r=await fetch('/v0/management/cpa-window-keeper/'+path,{method,headers:{Authorization:'Bearer '+secret},cache:'no-store',redirect:'error'});if(r.status===401||r.status===403)throw Error('AUTH');if(!r.ok)throw Error('HTTP '+r.status+'：请检查 CPA 管理密钥与反代路由');return r.json()}
+function showManual(hint){$('manual').classList.remove('hidden');$('manualToggle').classList.add('hidden');$('message').innerHTML=hint;setSession(t('sessionNeedKey'),'plain')}
+async function api(path,method='GET'){const r=await fetch('/v0/management/cpa-window-keeper/'+path,{method,headers:{Authorization:'Bearer '+secret},cache:'no-store',redirect:'error'});if(r.status===401||r.status===403)throw Error('AUTH');if(!r.ok)throw Error(t('httpError',r.status));return r.json()}
 function row(label,value,mono){const d=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;if(mono)dd.className='mono';d.append(dt,dd);return d}
 function accountCard(id,s){
   const el=document.createElement('article');el.className='acct card';el.dataset.provider=s.provider||'';
@@ -189,23 +276,26 @@ function accountCard(id,s){
   const title=document.createElement('div');title.className='acct-title';
   const h3=document.createElement('h3');h3.textContent=s.provider||'—';
   const sid=document.createElement('span');sid.className='acct-id';sid.textContent=id.length>12?id.slice(0,4)+'…'+id.slice(-4):id;
-  const tag=document.createElement('span');tag.className='tag';tag.dataset.tone=tones[s.status]||'idle';tag.textContent=names[s.status]||s.status;
+  const tag=document.createElement('span');tag.className='tag';tag.dataset.tone=tones[s.status]||'idle';tag.textContent=statusName(s.status);
   title.append(h3,sid);head.append(glyph,title,tag);
   const used=clamp(s.quota&&s.quota.used_percent);
   const meter=document.createElement('div');meter.className='meter';
   const fill=document.createElement('div');fill.className='meter-fill';fill.style.width=used+'%';meter.append(fill);
   const cap=document.createElement('div');cap.className='meter-cap';
-  const capL=document.createElement('span');capL.textContent='5 小时已用';
+  const capL=document.createElement('span');capL.textContent=t('meterCap');
   const capR=document.createElement('span');capR.textContent=used+'%';
   cap.append(capL,capR);
   const rows=document.createElement('dl');rows.className='rows';
-  rows.append(row('窗口结束',time(s.quota&&s.quota.reset_at)),row('下次额度检查',time(s.next_check)),row('最近发送',time(s.last_attempt)),row('最近验证成功',time(s.last_success)),row('已尝试 / 已验证',(s.attempts||0)+' / '+(s.successes||0)));
-  if(s.last_error)rows.append(row('提示',s.last_error));
+  rows.append(row(t('labReset'),time(s.quota&&s.quota.reset_at)),row(t('labNextCheck'),time(s.next_check)),row(t('labLastAttempt'),time(s.last_attempt)),row(t('labLastSuccess'),time(s.last_success)),row(t('labResult'),(s.attempts||0)+' / '+(s.successes||0)));
+  if(s.last_error)rows.append(row(t('labNote'),s.last_error));
   el.append(head,meter,cap,rows);
   return el;
 }
 function render(d){
-  $('summary').textContent=d.config?`模式：${d.config.dry_run?'仅观察（不会发送）':'自动开窗'} ｜ Codex：${d.config.codex_model} / low ｜ Claude：${d.config.claude_model} / 关闭思考 / 1 token${d.sending_suspended?' ｜ 发送已暂停':''}${d.error?' ｜ 错误：'+d.error:''}`:'未运行：'+d.error;
+  last=d;
+  $('summary').textContent=d.config
+    ?t('summaryLine',d.config.dry_run?t('modeObserve'):t('modeAuto'),d.config.codex_model,d.config.claude_model,d.sending_suspended?t('sendingSuspended'):'',d.error?t('errorSuffix',d.error):'')
+    :t('notRunning',d.error);
   const list=$('accounts');list.replaceChildren();
   for(const [id,s] of Object.entries(d.state&&d.state.accounts||{}))list.append(accountCard(id,s));
 }
@@ -213,27 +303,30 @@ async function load(){
   try{
     const d=await api('status');
     const reused=!!(secret&&secret===panelKey());
-    setSession(reused?'已沿用面板登录态':'已连接 · 密钥仅本页内存',reused?'':'plain');
-    $('message').innerHTML=reused?'<small>密钥来自面板登录态，无需在此输入；面板退出登录后重新点「重新读取登录态」。</small>':'';
+    setSession(reused?t('sessionReused'):t('sessionMemory'),reused?'':'plain');
+    $('message').innerHTML=reused?'<small>'+t('msgReused')+'</small>':'';
     render(d);
     clearInterval(timer);timer=setInterval(load,30000);
   }catch(e){
     clearInterval(timer);
-    if(e.message==='AUTH')showManual('<span class="warn">面板登录态已失效或未勾选「记住密码」。请回到面板重新登录（勾选记住密码），然后点「重新读取登录态」。</span>');
+    if(e.message==='AUTH')showManual('<span class="warn">'+t('msgAuthLost')+'</span>');
     else $('message').innerHTML='<span class="warn">'+e.message+'</span>';
   }
 }
 function boot(){
   clearInterval(timer);
   secret=panelKey();
-  if(secret){setSession('正在读取面板登录态…','plain');load()}
-  else showManual('<span class="warn">未检测到面板登录态。请回面板登录时勾选「记住密码」，或在此手动输入。</span>');
+  if(secret){setSession(t('sessionReading'),'plain');load()}
+  else showManual('<span class="warn">'+t('msgNoPanel')+'</span>');
 }
-$('check').onclick=async()=>{if(!secret)return;try{await api('check','POST');$('message').textContent='已排队；仍遵守额度检查间隔和防重复规则';setTimeout(load,1500)}catch(e){$('message').innerHTML='<span class="warn">'+(e.message==='AUTH'?'鉴权失效，请重新读取登录态':e.message)+'</span>'}};
+$('check').onclick=async()=>{if(!secret)return;try{await api('check','POST');$('message').textContent=t('msgQueued');setTimeout(load,1500)}catch(e){$('message').innerHTML='<span class="warn">'+(e.message==='AUTH'?t('msgAuthRetry'):e.message)+'</span>'}};
 $('connect').onclick=()=>{const v=$('key').value.trim();if(!v)return;secret=v;$('key').value='';$('manual').classList.add('hidden');$('manualToggle').classList.remove('hidden');load()};
-$('disconnect').onclick=()=>{clearInterval(timer);secret='';$('manual').classList.add('hidden');$('accounts').replaceChildren();setSession('已停止刷新','plain');$('summary').textContent='已停止刷新；自动调度不受影响'};
+$('disconnect').onclick=()=>{clearInterval(timer);secret='';last=null;$('manual').classList.add('hidden');$('accounts').replaceChildren();setSession(t('sessionStopped'),'plain');$('summary').textContent=t('msgStopped')};
 $('reconnect').onclick=boot;
 $('manualToggle').onclick=()=>showManual('');
-boot();
-addEventListener('storage',e=>{if(e.key==='cli-proxy-auth')boot()});
+/* Language: follow the panel; the toolbar button only overrides the current view. */
+function applyLang(){applyStatic();if(secret)load();else if(last)render(last)}
+$('lang').onclick=()=>{LANG=LANG==='en'?'zh':'en';applyLang()};
+addEventListener('storage',e=>{if(e.key==='cli-proxy-auth')boot();else if(e.key==='cli-proxy-language'){LANG=detectLang();applyLang()}});
+LANG=detectLang();applyStatic();boot();
 </script></html>
