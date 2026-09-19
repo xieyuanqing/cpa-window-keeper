@@ -99,6 +99,16 @@ are captured with every account identifier masked.
   indexes (the `abcd…1234` form the dashboard renders) are rewritten to `••••…••••` in the DOM, then
   the script asserts that neither the full index, nor its 4-character fragments, nor any email
   address remains — and only then writes the image.
+- The first version of these shots was captured at a 430px phone viewport and cropped the last card
+  (the dashboard scrolls *inside* the fixed-height panel iframe, so `full_page=True` on the outer
+  page does not help). They are now captured from the page opened standalone at a 1280×1200 desktop
+  viewport and published at 1400px: the script reads the palette (`--app-bg` `#eff2f7` / `#0a0a0a`,
+  `--app-surface`, `--text-primary|secondary|tertiary`, `--primary-color`, `--border-color`) and the
+  `data-theme` (`white` / `dark`) that the live panel injects into the sidebar iframe, applies exactly
+  those values to the standalone page, and checks that the theme really rendered — body background
+  luminance 242 (light) / 10 (dark). It refuses to write a shot whose image is not the requested width
+  or whose last account card falls outside the image. Result: 1400×1312, 3 cards, English, nothing
+  restored by the page's 30-second re-render.
 - v0.1.6 was deployed and superseded inside the same session: its `t()` substituted placeholders one
   argument off, which the live panel rendered as a literal `Mode: {0} | Codex: automatic window
   start …` summary. v0.1.7 fixes the substitution (regex `{n}` → `argv[n]`, the same implementation

@@ -21,10 +21,12 @@ credential prompt when the panel login state can be reused. The interface is bil
 | --- | --- |
 | ![dashboard light](docs/dashboard-light.png) | ![dashboard dark](docs/dashboard-dark.png) |
 
-Both screenshots are full-height captures of the dashboard exactly as it is served inside the
-sidebar, taken from a live panel with every account identifier masked (`••••…••••`) in the DOM
-before the image is written; the capture script refuses to save an image that still contains an
-auth index or an email address.
+Both shots are **desktop-width** captures (1280×1200 viewport at 2×, published at 1400px) of the
+dashboard page opened on its own, rendered with the palette and `data-theme` that the live panel
+injects into the sidebar. Every account identifier is masked (`••••…••••`) in the DOM before the
+image is written; the capture script refuses to save an image that still contains an auth index, a
+fragment of one or an email address, an image whose theme did not actually render, or one that cuts
+the last account card off.
 
 ## Status and compatibility
 
@@ -194,8 +196,11 @@ Go toolchain with GCC works: `go test -race ./... && go build -buildmode=c-share
   public panel URL and the browser wrapper: `CPAMP_PANEL_URL=... /opt/browser-automation/run.sh
   scripts/verify_i18n.py`.
 - `scripts/make_readme_shots.py`: regenerates `docs/dashboard-light.png` / `docs/dashboard-dark.png`
-  from the live panel in English, masks account identifiers in the DOM before capture, and refuses
-  to write an image that still contains one.
+  from the live panel in English. It reads the palette + `data-theme` the panel injects into the
+  sidebar iframe, applies them to the page opened standalone at a desktop viewport, masks account
+  identifiers in the DOM before capture, and refuses to write an image that still contains one, whose
+  theme did not render, or that cuts a card off. `SHOT_WIDTH` (1400) and `SHOT_VIEW_WIDTH` /
+  `SHOT_VIEW_HEIGHT` (1280×1200) override the geometry.
 
 Real provider measurements and production behaviour are recorded in
 [VERIFICATION.md](VERIFICATION.md). Private sandbox credentials are deliberately kept outside
