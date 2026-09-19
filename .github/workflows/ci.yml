@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test (race)
+        run: go test -p 1 -race -count=1 ./...
+
+      - name: build native plugin (c-shared)
+        run: go build -p 1 -trimpath -buildmode=c-shared -o /tmp/cpa-window-keeper.so .
+
+      - name: assert C ABI export exists
+        run: |
+          nm -D --defined-only /tmp/cpa-window-keeper.so | grep -q cliproxy_plugin_init

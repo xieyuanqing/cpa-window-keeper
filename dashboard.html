@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light dark"><title>5 小时自动开窗</title>
+<style>
+:root{
+  --accent:var(--primary-color,#0a84ff);
+  --ink:var(--text-primary,#111827);
+  --ink2:var(--text-secondary,#4b5563);
+  --ink3:var(--text-tertiary,#8e8e93);
+  --surface:var(--app-surface,#ffffff);
+  --page:var(--app-bg,#eef1f7);
+  --hair:var(--border-color,rgba(60,60,67,.12));
+  --good:#30d158;--warn:#ff9f0a;--bad:#ff453a;--idle:#8e8e93;
+  --radius:24px;--radius-sm:16px;
+  --glass:color-mix(in srgb,var(--surface) 66%,transparent);
+  --glass-2:color-mix(in srgb,var(--surface) 44%,transparent);
+  --stroke:color-mix(in srgb,var(--surface) 70%,transparent);
+  --shadow:0 10px 34px rgba(15,23,42,.10),0 1px 0 rgba(255,255,255,.6) inset;
+  --tint:color-mix(in srgb,var(--accent) 14%,transparent);
+  color-scheme:light dark;
+}
+html.theme-dark,:root[data-theme='dark']{
+  --shadow:0 12px 40px rgba(0,0,0,.45),0 1px 0 rgba(255,255,255,.06) inset;
+  --stroke:color-mix(in srgb,var(--surface) 60%,transparent);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{
+  font:400 16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  color:var(--ink);background:var(--page);
+  padding:calc(18px + env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom));
+  position:relative;overflow-x:hidden;
+}
+body::before,body::after{content:'';position:fixed;z-index:0;border-radius:50%;filter:blur(70px);opacity:.5;pointer-events:none}
+body::before{width:60vw;height:60vw;max-width:520px;max-height:520px;top:-16vw;right:-14vw;background:radial-gradient(circle at 30% 30%,color-mix(in srgb,var(--accent) 82%,transparent),transparent 70%)}
+body::after{width:66vw;height:66vw;max-width:560px;max-height:560px;bottom:-22vw;left:-18vw;background:radial-gradient(circle at 70% 70%,color-mix(in srgb,#ff375f 62%,transparent),transparent 70%)}
+.wrap{position:relative;z-index:1;max-width:760px;margin:0 auto}
+.card{
+  background:var(--glass);border:.5px solid var(--stroke);border-radius:var(--radius);
+  padding:18px;box-shadow:var(--shadow);
+  -webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);
+}
+.hero{padding:4px 2px 16px}
+.hero-top{display:flex;align-items:center;gap:14px}
+.app-icon{
+  width:56px;height:56px;flex:0 0 56px;border-radius:18px;display:grid;place-items:center;font-size:26px;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 92%,#fff),color-mix(in srgb,var(--accent) 60%,#7c3aed));
+  color:#fff;box-shadow:0 8px 22px color-mix(in srgb,var(--accent) 40%,transparent),0 1px 0 rgba(255,255,255,.45) inset;
+}
+h1{margin:0;font-size:27px;font-weight:700;letter-spacing:-.6px}
+.sub{margin:3px 0 0;font-size:13.5px;color:var(--ink3);font-weight:400}
+.toolbar{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px;align-items:center}
+.pill{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;font-size:13px;font-weight:600;
+  background:var(--tint);color:color-mix(in srgb,var(--accent) 78%,var(--ink));
+  border:.5px solid color-mix(in srgb,var(--accent) 26%,transparent);
+}
+.pill::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.pill.plain{background:color-mix(in srgb,var(--ink3) 16%,transparent);color:var(--ink2);border-color:transparent}
+.pill.plain::before{display:none}
+.btn{
+  -webkit-appearance:none;appearance:none;font:600 14.5px/1 inherit;color:var(--ink);cursor:pointer;
+  padding:11px 17px;border-radius:14px;border:.5px solid var(--hair);
+  background:color-mix(in srgb,var(--surface) 55%,transparent);
+  -webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
+  transition:transform .18s cubic-bezier(.2,.8,.2,1),background .18s ease,opacity .18s ease;
+}
+.btn.primary{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 38%,transparent)}
+.btn:active{transform:scale(.96);opacity:.9}
+.btn:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:2px}
+.manual{margin-top:14px;padding:15px;border-radius:var(--radius-sm);background:var(--glass-2);border:.5px solid var(--stroke)}
+.manual p{margin:0 0 11px;font-size:13px;color:var(--ink3)}
+.row{display:flex;gap:9px;flex-wrap:wrap}
+input[type=password]{
+  flex:1 1 220px;min-width:0;font:400 15px/1.3 inherit;color:var(--ink);
+  padding:12px 14px;border-radius:14px;border:.5px solid var(--hair);
+  background:color-mix(in srgb,var(--surface) 70%,transparent);
+}
+input[type=password]::placeholder{color:var(--ink3)}
+input[type=password]:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:1px;border-color:transparent}
+.note{margin-top:12px;font-size:13px;color:var(--ink3);min-height:0}
+.note:empty{display:none}
+.warn{color:var(--warn);font-weight:500}
+.summary{margin-bottom:16px;font-size:14px;color:var(--ink2)}
+.accounts{display:grid;gap:14px}
+@media(min-width:700px){.accounts{grid-template-columns:1fr 1fr}}
+.acct{display:flex;flex-direction:column;gap:13px}
+.acct-head{display:flex;align-items:center;gap:12px}
+.glyph{
+  width:42px;height:42px;flex:0 0 42px;border-radius:14px;display:grid;place-items:center;
+  font:700 16px/1 inherit;color:#fff;letter-spacing:-.3px;
+  background:linear-gradient(150deg,#ff9f0a,#ff375f);box-shadow:0 6px 16px rgba(255,55,95,.28)
+}
+.acct[data-provider='codex'] .glyph{background:linear-gradient(150deg,#64d2ff,#0a84ff);box-shadow:0 6px 16px rgba(10,132,255,.28)}
+.acct[data-provider='claude'] .glyph{background:linear-gradient(150deg,#ffb27a,#e07b39);box-shadow:0 6px 16px rgba(224,123,57,.28)}
+.acct-title{min-width:0;flex:1}
+.acct h3{margin:0;font-size:16px;font-weight:650;letter-spacing:-.2px;text-transform:capitalize}
+.acct-id{display:block;font:500 12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink3)}
+.tag{
+  flex:0 0 auto;font-size:12px;font-weight:600;padding:6px 11px;border-radius:999px;white-space:nowrap;
+  background:color-mix(in srgb,var(--idle) 18%,transparent);color:var(--ink2)
+}
+.tag[data-tone='good']{background:color-mix(in srgb,var(--good) 20%,transparent);color:color-mix(in srgb,var(--good) 82%,var(--ink))}
+.tag[data-tone='info']{background:var(--tint);color:color-mix(in srgb,var(--accent) 80%,var(--ink))}
+.tag[data-tone='warn']{background:color-mix(in srgb,var(--warn) 20%,transparent);color:color-mix(in srgb,var(--warn) 82%,var(--ink))}
+.tag[data-tone='bad']{background:color-mix(in srgb,var(--bad) 20%,transparent);color:color-mix(in srgb,var(--bad) 80%,var(--ink))}
+.meter{height:9px;border-radius:999px;background:color-mix(in srgb,var(--ink3) 22%,transparent);overflow:hidden}
+.meter-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,#ff375f 55%,var(--accent)));transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.meter-cap{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink3);margin-top:-6px}
+.rows{display:grid;gap:0;margin:0}
+.rows>div{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-top:.5px solid color-mix(in srgb,var(--hair) 70%,transparent)}
+.rows>div:first-child{border-top:0}
+.rows dt{margin:0;font-size:13.5px;color:var(--ink3)}
+.rows dd{margin:0;font-size:13.5px;font-weight:550;color:var(--ink);text-align:right}
+.rows dd.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
+.hint{margin-top:14px;font-size:12.5px;color:var(--ink3);text-align:center}
+.hidden{display:none}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<div class="wrap">
+<header class="hero">
+  <div class="hero-top">
+    <div class="app-icon">◎</div>
+    <div><h1>5 小时自动开窗</h1><p class="sub">Window Keeper · 只在空闲窗口发最小请求</p></div>
+  </div>
+  <div class="toolbar">
+    <span id="session" class="pill">正在读取面板登录态…</span>
+    <button id="check" class="btn primary">检查调度</button>
+    <button id="reconnect" class="btn">重新读取登录态</button>
+    <button id="manualToggle" class="btn hidden">手动输入密钥</button>
+  </div>
+  <div id="manual" class="manual hidden">
+    <p>面板登录时勾选「记住密码」即可免输入；面板端已退出登录时需要重新登录。</p>
+    <div class="row"><input id="key" type="password" placeholder="CPA 管理密钥（不是面板管理员密码）" autocomplete="off"><button id="connect" class="btn primary">连接</button><button id="disconnect" class="btn">停止刷新</button></div>
+  </div>
+  <div id="message" class="note"></div>
+</header>
+<div class="card summary" id="summary">尚未连接。首次安装默认 dry_run=true，仅观察，不发请求。开关与模型可在 CPA 插件设置中修改。</div>
+<div id="accounts" class="accounts"></div>
+<p class="hint">不会提前重置官方限额，不会恢复手动禁用账号。</p>
+</div>
+<!-- data-cfasync="false": Cloudflare Rocket Loader must not rewrite this inline script
+     into a non-executable type; the plugin CSP intentionally blocks Rocket Loader's loader. -->
+<script data-cfasync="false">
+let secret='',timer;const $=id=>document.getElementById(id);
+const names={disabled:'账号已禁用 · 跳过',host_cooldown:'CPA 冷却中',quota_error:'额度查询失败 · 退避',no_five_hour_window:'不是 5 小时额度 · 跳过',quota_blocked:'额度阻挡 · 等待恢复',counting_down:'正在倒计时',window_started:'已验证开窗成功',awaiting_window_confirmation:'尚未确认开窗 · 防重复冷却',idle_grace:'空闲状态确认中',would_start_window:'检测到空闲 · 演练模式不发送',request_reserved:'已持久化发送预留',request_sent_waiting_verification:'请求成功 · 等待额度回查',request_failed_waiting_verification:'请求失败 · 等待回查，不立即重试'};
+const tones={window_started:'good',counting_down:'info',request_sent_waiting_verification:'info',would_start_window:'info',request_reserved:'idle',idle_grace:'idle',awaiting_window_confirmation:'idle',host_cooldown:'idle',disabled:'idle',no_five_hour_window:'idle',quota_blocked:'warn',quota_error:'warn',request_failed_waiting_verification:'bad',request_failed:'bad'};
+const time=s=>!s||s.startsWith('0001-')?'—':new Date(s).toLocaleString();
+const clamp=v=>Math.max(0,Math.min(100,Number(v)||0));
+/* Reuse the CPAMP panel login state (same origin, obfuscated storage). */
+function decodePanelStorage(raw){
+  if(!raw)return null;
+  if(raw.indexOf('enc::v1::')!==0)return raw;
+  try{
+    const bin=atob(raw.slice('enc::v1::'.length));
+    const enc=Uint8Array.from(bin,c=>c.charCodeAt(0));
+    const keyBytes=new TextEncoder().encode('cli-proxy-api-webui::secure-storage|'+location.host+'|'+navigator.userAgent);
+    const out=new Uint8Array(enc.length);
+    enc.forEach((v,i)=>{out[i]=v^keyBytes[i%keyBytes.length]});
+    return new TextDecoder().decode(out);
+  }catch(e){return null}
+}
+function parsePanel(raw){if(!raw)return null;try{return JSON.parse(decodePanelStorage(raw))}catch(e){return null}}
+function panelKey(){
+  try{
+    const persisted=parsePanel(localStorage.getItem('cli-proxy-auth'));
+    const auth=persisted&&persisted.state||persisted;
+    if(auth&&auth.managementKey&&auth.rememberPassword!==false){
+      if(auth.apiBase&&new URL(auth.apiBase,location.origin).origin!==location.origin)return '';
+      return String(auth.managementKey).trim();
+    }
+    const legacy=parsePanel(localStorage.getItem('managementKey'));
+    return typeof legacy==='string'?legacy.trim():'';
+  }catch(e){return ''}
+}
+function setSession(text,kind){const el=$('session');el.textContent=text;el.className=kind==='plain'?'pill plain':'pill'}
+function showManual(hint){$('manual').classList.remove('hidden');$('manualToggle').classList.add('hidden');$('message').innerHTML=hint;setSession('需要密钥','plain')}
+async function api(path,method='GET'){const r=await fetch('/v0/management/cpa-window-keeper/'+path,{method,headers:{Authorization:'Bearer '+secret},cache:'no-store',redirect:'error'});if(r.status===401||r.status===403)throw Error('AUTH');if(!r.ok)throw Error('HTTP '+r.status+'：请检查 CPA 管理密钥与反代路由');return r.json()}
+function row(label,value,mono){const d=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;if(mono)dd.className='mono';d.append(dt,dd);return d}
+function accountCard(id,s){
+  const el=document.createElement('article');el.className='acct card';el.dataset.provider=s.provider||'';
+  const head=document.createElement('div');head.className='acct-head';
+  const glyph=document.createElement('span');glyph.className='glyph';glyph.textContent=(s.provider||'?').slice(0,1).toUpperCase();
+  const title=document.createElement('div');title.className='acct-title';
+  const h3=document.createElement('h3');h3.textContent=s.provider||'—';
+  const sid=document.createElement('span');sid.className='acct-id';sid.textContent=id.length>12?id.slice(0,4)+'…'+id.slice(-4):id;
+  const tag=document.createElement('span');tag.className='tag';tag.dataset.tone=tones[s.status]||'idle';tag.textContent=names[s.status]||s.status;
+  title.append(h3,sid);head.append(glyph,title,tag);
+  const used=clamp(s.quota&&s.quota.used_percent);
+  const meter=document.createElement('div');meter.className='meter';
+  const fill=document.createElement('div');fill.className='meter-fill';fill.style.width=used+'%';meter.append(fill);
+  const cap=document.createElement('div');cap.className='meter-cap';
+  const capL=document.createElement('span');capL.textContent='5 小时已用';
+  const capR=document.createElement('span');capR.textContent=used+'%';
+  cap.append(capL,capR);
+  const rows=document.createElement('dl');rows.className='rows';
+  rows.append(row('窗口结束',time(s.quota&&s.quota.reset_at)),row('下次额度检查',time(s.next_check)),row('最近发送',time(s.last_attempt)),row('最近验证成功',time(s.last_success)),row('已尝试 / 已验证',(s.attempts||0)+' / '+(s.successes||0)));
+  if(s.last_error)rows.append(row('提示',s.last_error));
+  el.append(head,meter,cap,rows);
+  return el;
+}
+function render(d){
+  $('summary').textContent=d.config?`模式：${d.config.dry_run?'仅观察（不会发送）':'自动开窗'} ｜ Codex：${d.config.codex_model} / low ｜ Claude：${d.config.claude_model} / 关闭思考 / 1 token${d.sending_suspended?' ｜ 发送已暂停':''}${d.error?' ｜ 错误：'+d.error:''}`:'未运行：'+d.error;
+  const list=$('accounts');list.replaceChildren();
+  for(const [id,s] of Object.entries(d.state&&d.state.accounts||{}))list.append(accountCard(id,s));
+}
+async function load(){
+  try{
+    const d=await api('status');
+    const reused=!!(secret&&secret===panelKey());
+    setSession(reused?'已沿用面板登录态':'已连接 · 密钥仅本页内存',reused?'':'plain');
+    $('message').innerHTML=reused?'<small>密钥来自面板登录态，无需在此输入；面板退出登录后重新点「重新读取登录态」。</small>':'';
+    render(d);
+    clearInterval(timer);timer=setInterval(load,30000);
+  }catch(e){
+    clearInterval(timer);
+    if(e.message==='AUTH')showManual('<span class="warn">面板登录态已失效或未勾选「记住密码」。请回到面板重新登录（勾选记住密码），然后点「重新读取登录态」。</span>');
+    else $('message').innerHTML='<span class="warn">'+e.message+'</span>';
+  }
+}
+function boot(){
+  clearInterval(timer);
+  secret=panelKey();
+  if(secret){setSession('正在读取面板登录态…','plain');load()}
+  else showManual('<span class="warn">未检测到面板登录态。请回面板登录时勾选「记住密码」，或在此手动输入。</span>');
+}
+$('check').onclick=async()=>{if(!secret)return;try{await api('check','POST');$('message').textContent='已排队；仍遵守额度检查间隔和防重复规则';setTimeout(load,1500)}catch(e){$('message').innerHTML='<span class="warn">'+(e.message==='AUTH'?'鉴权失效，请重新读取登录态':e.message)+'</span>'}};
+$('connect').onclick=()=>{const v=$('key').value.trim();if(!v)return;secret=v;$('key').value='';$('manual').classList.add('hidden');$('manualToggle').classList.remove('hidden');load()};
+$('disconnect').onclick=()=>{clearInterval(timer);secret='';$('manual').classList.add('hidden');$('accounts').replaceChildren();setSession('已停止刷新','plain');$('summary').textContent='已停止刷新；自动调度不受影响'};
+$('reconnect').onclick=boot;
+$('manualToggle').onclick=()=>showManual('');
+boot();
+addEventListener('storage',e=>{if(e.key==='cli-proxy-auth')boot()});
+</script></html>

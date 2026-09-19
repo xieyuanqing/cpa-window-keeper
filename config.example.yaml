@@ -1,0 +1,16 @@
+# Merge only the cpa-window-keeper entry into the existing plugins.configs map.
+# This file is a sample, NOT a complete CPA configuration.
+plugins:
+  enabled: true
+  configs:
+    cpa-window-keeper:
+      enabled: true
+      dry_run: true
+      codex_enabled: true
+      claude_enabled: true
+      codex_model: gpt-5.6-luna
+      claude_model: claude-haiku-4-5-20251001
+      poll_seconds: 60
+      grace_seconds: 30
+      account_allowlist: ""
+      state_path: plugins/data/cpa-window-keeper/state.json

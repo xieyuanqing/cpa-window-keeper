@@ -1,0 +1,19 @@
+# Build output and local artifacts
+dist/
+release/
+*.so
+*.h
+
+# Test logs
+test-results.jsonl
+
+# Python helper caches
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
