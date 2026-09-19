@@ -62,3 +62,16 @@ Artifact: `dist/cpa-window-keeper-v0.1.3.so`, SHA-256 `e530c7ce062c8336f6d2f5a59
 - `scripts/browser_screenshot_panel.py` captures the embedded panel; on phone-width viewports the CPAMP sidebar is a slide-over drawer, so the script resolves the nav link's `href` and navigates directly instead of clicking.
 - v0.1.4 changes metadata only: `GitHubRepository` moved from the `local://` marker to the published repository URL. Config continuity, account set and `dry_run: false` were preserved by the hot upgrade.
 
+## Panel storage format `enc::v2::` support — 2026-09-19 (v0.1.5)
+
+Artifact: `dist/cpa-window-keeper-v0.1.5.so`, SHA-256 `0de1b8d45acb61497a70c3b54b842fea1b6bd334c4a785ecc10ed1586cd66139`.
+
+The dashboard decoded only `enc::v1::` panel storage. Current CPAMP builds write `cli-proxy-auth` as `enc::v2::`, whose XOR key no longer includes the user agent (`cli-proxy-api-webui::secure-storage|v2|<host>` instead of `...|secure-storage|<host>|<user-agent>`). With v1-only decoding the payload failed to parse, so the page silently degraded to 「需要密钥」 and asked for the management key by hand.
+
+- `decodePanelStorage` now accepts both prefixes (both are 9 characters, so the payload slice is shared) and picks the salt by prefix: `|v2|` + host for `enc::v2::`, host + user agent for `enc::v1::`.
+- The legacy `managementKey` fallback also accepts the object form (`{managementKey: ...}`) in addition to the bare string.
+- Verified in a real Chrome against the production panel (`CPAMP_PANEL_URL=https://cliproxy.nijikit.com/management.html`) via `scripts/browser_panel_verify.py`:
+  - panel login **with** 「记住密码」 → `password_visible: false`, badge `已沿用面板登录态`, 3 account cards, `refresh: queue accepted` (auto-window scheduling reached the plugin).
+  - panel login **without** 「记住密码」 → `password_visible: true`, badge `需要密钥` — unchanged, still the documented CPAMP limitation.
+- Upgrade: `python3 scripts/upgrade_production.py --so dist/cpa-window-keeper-v0.1.5.so --expect-version 0.1.5` → `upgraded: true` 0.1.4→0.1.5, `config_preserved: true`, `dry_run: false`, 3 accounts. Hot swap, no CPA restart.
+

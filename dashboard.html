@@ -150,11 +150,14 @@ const clamp=v=>Math.max(0,Math.min(100,Number(v)||0));
 /* Reuse the CPAMP panel login state (same origin, obfuscated storage). */
 function decodePanelStorage(raw){
   if(!raw)return null;
-  if(raw.indexOf('enc::v1::')!==0)return raw;
+  if(raw.indexOf('enc::')!==0)return raw;
   try{
-    const bin=atob(raw.slice('enc::v1::'.length));
+    const bin=atob(raw.slice(9));
     const enc=Uint8Array.from(bin,c=>c.charCodeAt(0));
-    const keyBytes=new TextEncoder().encode('cli-proxy-api-webui::secure-storage|'+location.host+'|'+navigator.userAgent);
+    const seed=raw.indexOf('enc::v2::')===0
+      ? 'cli-proxy-api-webui::secure-storage|v2|'+location.host
+      : 'cli-proxy-api-webui::secure-storage|'+location.host+'|'+navigator.userAgent;
+    const keyBytes=new TextEncoder().encode(seed);
     const out=new Uint8Array(enc.length);
     enc.forEach((v,i)=>{out[i]=v^keyBytes[i%keyBytes.length]});
     return new TextDecoder().decode(out);
@@ -170,7 +173,9 @@ function panelKey(){
       return String(auth.managementKey).trim();
     }
     const legacy=parsePanel(localStorage.getItem('managementKey'));
-    return typeof legacy==='string'?legacy.trim():'';
+    if(typeof legacy==='string')return legacy.trim();
+    if(legacy&&legacy.managementKey)return String(legacy.managementKey).trim();
+    return '';
   }catch(e){return ''}
 }
 function setSession(text,kind){const el=$('session');el.textContent=text;el.className=kind==='plain'?'pill plain':'pill'}

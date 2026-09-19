@@ -124,8 +124,11 @@ durable duplicate protection. No force-send endpoint is exposed.
 
 Reached from a CPA Manager Plus sidebar entry, the dashboard reuses the panel login state: it
 reads the panel's `cli-proxy-auth` entry from same-origin `localStorage` (CPAMP's reversible
-`enc::v1::` obfuscation, salt `cli-proxy-api-webui::secure-storage` + host + user agent), and
-only when `rememberPassword` is set and the stored `apiBase` origin matches the current origin.
+obfuscation, salt `cli-proxy-api-webui::secure-storage`), and only when `rememberPassword` is set
+and the stored `apiBase` origin matches the current origin. Both storage versions are supported:
+`enc::v2::` (current panel builds; salt `cli-proxy-api-webui::secure-storage|v2|` + host) and
+`enc::v1::` (older builds; salt + host + user agent). Supporting both keeps the dashboard working
+across a panel upgrade — decoding only v1 silently degrades to the manual key prompt.
 The key stays in page memory; the public HTML carries no credential.
 
 - Panel logged in **with 「记住密码」** → the page connects automatically, no key prompt, and the

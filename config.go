@@ -12,7 +12,7 @@ import (
 )
 
 const pluginID = "cpa-window-keeper"
-const version = "0.1.4"
+const version = "0.1.5"
 const window = 5 * time.Hour
 
 type Config struct {
