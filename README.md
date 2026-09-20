@@ -30,7 +30,7 @@ the last account card off.
 
 ## Status and compatibility
 
-- Built and tested against CPA **v7.3.4 / 8335eac**, Linux amd64, glibc.
+- Runtime-tested against CPA **v7.3.4 / 8335eac** on Linux amd64, glibc. Release builds are also provided for Linux arm64.
 - Native ABI 1, RPC schema 6. No CPA source modification is required.
 - Metadata `GitHubRepository` points at this repository; the plugin can be registered from a plain
   `.so` placed in the host plugin directory.
@@ -169,13 +169,14 @@ localize them, so those follow whatever was registered.
 ## Build and test
 
 ```bash
-bash scripts/build.sh        # docker (golang:1.26-bookworm), 1 CPU, GOMAXPROCS=1, race tests + vet + c-shared build
+bash scripts/build.sh        # race tests + vet, then Linux amd64/arm64 .so + store zips
 python3 scripts/abi_smoke.py # synthetic, credential-free host driving the real compiled .so via ctypes
 ```
 
-The Docker build needs dependencies already present in `/root/go/pkg/mod` (or run
-`go mod download` first) and keeps the build container offline. Without Docker, a normal
-Go toolchain with GCC works: `go test -race ./... && go build -buildmode=c-shared -o dist/plugin.so`.
+The Go module build stays offline (`GOPROXY=off`, dependencies mounted read-only from
+`/root/go/pkg/mod`). The container uses Debian apt only to install `zip` and the Linux arm64
+cross-compiler. Without Docker, a normal Go toolchain with GCC works for the host platform:
+`go test -race ./... && go build -buildmode=c-shared -o dist/plugin.so`.
 
 - `quota_test.go`: strict provider schemas, expired/current windows, free accounts, weekly and
   model-specific blocks, invalid inputs.
@@ -222,6 +223,17 @@ this project and are never included in distributable archives.
 - Tests simulate five-hour advancement with a mock clock; they are not a claim of having waited
   through repeated live cycles. First production-cycle confirmation must come from quota readback
   in the status page.
+
+## Acknowledgements
+
+The plugin is deliberately small, but its idea and implementation both come from existing behaviour and tooling:
+
+* **The product idea came from a common operator habit:** after a rolling five-hour window ends, send one tiny request so the provider starts the next window now instead of on the first real request later in the day. Window Keeper automates that wake-up request; it does not create, reset or extend quota.
+* **[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)** and its MIT `host-model-callback` plugin example at commit `8335eac` provide the C ABI bridge, lifecycle pattern and host callbacks used to list credentials, query quota and pin the tiny request to one exact account.
+* **Anthropic's OAuth usage endpoint and Codex quota responses** define the five-hour/weekly window shapes and reset timestamps. The plugin treats those upstream values as authoritative and fails closed when a response is unknown or ambiguous.
+* **CPA Manager Plus** provides the sidebar host, theme variables and same-origin panel login state that the embedded dashboard follows. No CPAMP source is bundled here.
+* **[gopkg.in/yaml.v3](https://gopkg.in/yaml.v3)** is the only Go module dependency; its license is included as `YAML-LICENSE.txt`.
+* **[patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright)** drives the live-panel language checks and the masked light/dark README screenshots.
 
 ## Disclaimer
 
